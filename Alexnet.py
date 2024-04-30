@@ -74,11 +74,14 @@ class Alexnet(nn.Module):
         self.fc3.bias.data.fill_(0)
 
         self.soft = nn.Softmax()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.test_accuracy_list = []
-        transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Normalize((0.5,), (0.5,))])
-        testset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+        )
+        testset = datasets.CIFAR10(
+            root="./data", train=False, download=True, transform=transform
+        )
         self.testloader = DataLoader(testset, batch_size=512, shuffle=False)
         # file_path_test = "CIFAR10_testset"
         # if not os.path.exists(file_path_test):
@@ -113,8 +116,18 @@ class Alexnet(nn.Module):
         # del x
         return logits
 
-    def train_model(self, train_loader, criterion, optimizer, n_epochs=10, print_every=500, model_name="Alexnet_model"):
-        model, best_val_accuracy, best_model_state_dict, start_epoch = prepare_for_training(self, model_name, optimizer)
+    def train_model(
+        self,
+        train_loader,
+        criterion,
+        optimizer,
+        n_epochs=10,
+        print_every=500,
+        model_name="Alexnet_model",
+    ):
+        model, best_val_accuracy, best_model_state_dict, start_epoch = (
+            prepare_for_training(self, model_name, optimizer)
+        )
         for epoch in range(start_epoch, n_epochs):
             running_loss = 0.0
             correct = 0
@@ -129,11 +142,27 @@ class Alexnet(nn.Module):
                 else:
                     outputs = self(inputs)
                 try:
-                    labels = labels.view(-1, outputs.size()[1]).float().detach().clone().requires_grad_(True)
+                    labels = (
+                        labels.view(-1, outputs.size()[1])
+                        .float()
+                        .detach()
+                        .clone()
+                        .requires_grad_(True)
+                    )
                 except:
-                    labels = torch.tensor(list(
-                        map(lambda x: one_hot_encode(x, outputs.size()[1]), labels))).detach().clone().requires_grad_(
-                        True)
+                    labels = (
+                        torch.tensor(
+                            list(
+                                map(
+                                    lambda x: one_hot_encode(x, outputs.size()[1]),
+                                    labels,
+                                )
+                            )
+                        )
+                        .detach()
+                        .clone()
+                        .requires_grad_(True)
+                    )
 
                 # # Get the maximum values along the third dimension (dimension with size 10)
                 # fitnesses, _ = torch.max(labels_copy, dim=2)
@@ -156,49 +185,62 @@ class Alexnet(nn.Module):
                 if i % print_every == print_every - 1:
                     finish_time = time.time()
                     total_time = finish_time - start_time
-                    print('[%d, %5d] loss: %.3f accuracy: %.3f the time it took: %.3f seconds' % (
-                        epoch + 1, i + 1, running_loss / print_every, 100 * correct / total, total_time))
+                    print(
+                        "[%d, %5d] loss: %.3f accuracy: %.3f the time it took: %.3f seconds"
+                        % (
+                            epoch + 1,
+                            i + 1,
+                            running_loss / print_every,
+                            100 * correct / total,
+                            total_time,
+                        )
+                    )
                     running_loss = 0.0
                     correct = 0
                     total = 0
                     start_time = time.time()
             finish_time_epoch = time.time()
             total_time_epoch = finish_time_epoch - start_time_epoch
-            print(f'Epoch {epoch + 1} took {total_time_epoch} seconds')
+            print(f"Epoch {epoch + 1} took {total_time_epoch} seconds")
             validation_accuracy = self.validate_model()
             Config.log.info(
-                f"Epoch {epoch + 1} took {total_time_epoch} seconds, Accuracy on test set is: {validation_accuracy}")
+                f"Epoch {epoch + 1} took {total_time_epoch} seconds, Accuracy on test set is: {validation_accuracy}"
+            )
             self.test_accuracy_list.append(validation_accuracy)
             # Save model after each epoch
             checkpoint = {
-                'epoch': epoch + 1,
-                'model_state_dict': self.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'test_accuracy_list': self.test_accuracy_list
+                "epoch": epoch + 1,
+                "model_state_dict": self.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "test_accuracy_list": self.test_accuracy_list,
             }
             directory = f"checkpoints/{self.__class__.__name__}"
-            torch.save(checkpoint, f'./{directory}/{model_name}.pth')
+            torch.save(checkpoint, f"./{directory}/{model_name}.pth")
             if validation_accuracy > best_val_accuracy:
                 best_val_accuracy = validation_accuracy
                 best_model_state_dict = {
-                    'epoch': epoch + 1,
-                    'model_state_dict': self.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'test_accuracy_list': self.test_accuracy_list
+                    "epoch": epoch + 1,
+                    "model_state_dict": self.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "test_accuracy_list": self.test_accuracy_list,
                 }
-                torch.save(best_model_state_dict, f'./{directory}/best_accuracy_{model_name}.pth')
+                torch.save(
+                    best_model_state_dict,
+                    f"./{directory}/best_accuracy_{model_name}.pth",
+                )
             print("Saved model checkpoint!")
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         print(
-            f"The maximal accuracy during training was: {max(self.test_accuracy_list)} on epoch: {self.test_accuracy_list.index(max(self.test_accuracy_list))}")
+            f"The maximal accuracy during training was: {max(self.test_accuracy_list)} on epoch: {self.test_accuracy_list.index(max(self.test_accuracy_list))}"
+        )
         self.plot_accuracy_graph()
 
     def plot_accuracy_graph(self):
         accuracy_list = self.test_accuracy_list
         # Plotting using Seaborn
         sns.set(style="darkgrid")
-        sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker='X')
+        sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker="X")
 
         # # Add accuracy values as annotations
         # for i, accuracy in enumerate(accuracy_list):
@@ -232,7 +274,11 @@ class Alexnet(nn.Module):
                     outputs = model(images)
                 else:
                     outputs = self(images)
-                images, labels, outputs = images.to(self.device), labels.to(self.device), outputs.to(self.device)
+                images, labels, outputs = (
+                    images.to(self.device),
+                    labels.to(self.device),
+                    outputs.to(self.device),
+                )
                 _, predicted = torch.max(outputs, dim=1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
@@ -260,7 +306,11 @@ class Alexnet(nn.Module):
                     outputs = model(images)
                 else:
                     outputs = self(images)
-                images, labels, outputs = images.to(self.device), labels.to(self.device), outputs.to(self.device)
+                images, labels, outputs = (
+                    images.to(self.device),
+                    labels.to(self.device),
+                    outputs.to(self.device),
+                )
                 _, predicted = torch.max(outputs, dim=1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()

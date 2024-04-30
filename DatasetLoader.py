@@ -1,4 +1,5 @@
 import os
+from typing import Tuple, Any, Callable
 
 import numpy as np
 import torch
@@ -18,19 +19,38 @@ class DatasetLoader(Dataset):
         If None, all generations are included.
     :return: None
     """
-    def __init__(self, data_dir, file_size=20000, transform=None, subset_generations=None):
+
+    def __init__(
+        self, data_dir, file_size=20000, transform=None, subset_generations=None
+    ):
         self.data_dir = data_dir
         self.transform = transform
         file_list = os.listdir(data_dir)
         self.data_list = sorted([x for x in file_list if "_input" in x])
         self.labels_list = sorted([x for x in file_list if "_labels" in x])
         if subset_generations is not None:
-            away_data = sorted([x for x in self.data_list if "Away_" in x], key=lambda y: int(y.split("_")[-2]))
-            away_labels = sorted([x for x in self.labels_list if "Away_" in x], key=lambda y: int(y.split("_")[-2]))
-            toward_data = sorted([x for x in self.data_list if "Toward_" in x], key=lambda y: int(y.split("_")[-2]))
-            toward_labels = sorted([x for x in self.labels_list if "Toward_" in x], key=lambda y: int(y.split("_")[-2]))
-            self.data_list = away_data[:subset_generations] + toward_data[:subset_generations]
-            self.labels_list = away_labels[:subset_generations] + toward_labels[:subset_generations]
+            away_data = sorted(
+                [x for x in self.data_list if "Away_" in x],
+                key=lambda y: int(y.split("_")[-2]),
+            )
+            away_labels = sorted(
+                [x for x in self.labels_list if "Away_" in x],
+                key=lambda y: int(y.split("_")[-2]),
+            )
+            toward_data = sorted(
+                [x for x in self.data_list if "Toward_" in x],
+                key=lambda y: int(y.split("_")[-2]),
+            )
+            toward_labels = sorted(
+                [x for x in self.labels_list if "Toward_" in x],
+                key=lambda y: int(y.split("_")[-2]),
+            )
+            self.data_list = (
+                away_data[:subset_generations] + toward_data[:subset_generations]
+            )
+            self.labels_list = (
+                away_labels[:subset_generations] + toward_labels[:subset_generations]
+            )
         self.file_size = file_size
 
     def __len__(self) -> int:
@@ -41,7 +61,7 @@ class DatasetLoader(Dataset):
         """
         return len(self.data_list) * self.file_size
 
-    def __getitem__(self, idx: int) -> tuple[any, any]:
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
         """
         Get a sample from the dataset at the specified index.
 
@@ -57,8 +77,12 @@ class DatasetLoader(Dataset):
         labels_file_path = os.path.join(self.data_dir, labels_file_name)
 
         # Load the data tensor from the file
-        data = np.load(data_file_path, mmap_mode='r')  # Use mmap_mode to avoid loading the entire file into memory
-        labels = np.load(labels_file_path, mmap_mode='r')  # Use mmap_mode to avoid loading the entire file into memory
+        data = np.load(
+            data_file_path, mmap_mode="r"
+        )  # Use mmap_mode to avoid loading the entire file into memory
+        labels = np.load(
+            labels_file_path, mmap_mode="r"
+        )  # Use mmap_mode to avoid loading the entire file into memory
 
         # Extract the individual tensor at the specified index
         data = data[sample_idx]
@@ -76,7 +100,7 @@ class DatasetLoader(Dataset):
 
         return data, labels
 
-    def set_transform(self, transform: callable) -> None:
+    def set_transform(self, transform: Callable) -> None:
         """
         Set the transformation to be applied to the data.
 

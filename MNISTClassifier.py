@@ -22,16 +22,24 @@ class MNISTClassifier(nn.Module):
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.bn3 = nn.BatchNorm2d(128)  # BatchNorm layer after the third convolution
         self.fc1 = nn.Linear(128 * 28 * 28, 256)
-        self.bn4 = nn.BatchNorm1d(256)  # BatchNorm layer after the first fully connected layer
+        self.bn4 = nn.BatchNorm1d(
+            256
+        )  # BatchNorm layer after the first fully connected layer
         self.fc2 = nn.Linear(256, 128)
-        self.bn5 = nn.BatchNorm1d(128)  # BatchNorm layer after the second fully connected layer
+        self.bn5 = nn.BatchNorm1d(
+            128
+        )  # BatchNorm layer after the second fully connected layer
         self.fc3 = nn.Linear(128, 10)
         self.relu = nn.ReLU()
         self.softmax = nn.Softmax(dim=1)
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-        test_dataset = FashionMNIST(root='./data', train=False, transform=transform, download=True)
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+        )
+        test_dataset = FashionMNIST(
+            root="./data", train=False, transform=transform, download=True
+        )
         self.testloader = DataLoader(test_dataset, batch_size=512, shuffle=False)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.test_accuracy_list = []
 
     def forward(self, x):
@@ -123,8 +131,18 @@ class MNISTClassifier(nn.Module):
     #                 total = 0
     #                 start_time = time.time()
 
-    def train_model(self, train_loader, criterion, optimizer, n_epochs=10, print_every=500, model_name="mnist_model"):
-        model, best_val_accuracy, best_model_state_dict, start_epoch = prepare_for_training(self, model_name, optimizer)
+    def train_model(
+        self,
+        train_loader,
+        criterion,
+        optimizer,
+        n_epochs=10,
+        print_every=500,
+        model_name="mnist_model",
+    ):
+        model, best_val_accuracy, best_model_state_dict, start_epoch = (
+            prepare_for_training(self, model_name, optimizer)
+        )
         for epoch in range(start_epoch, n_epochs):
             running_loss = 0.0
             correct = 0
@@ -141,11 +159,27 @@ class MNISTClassifier(nn.Module):
                 else:
                     outputs = self(inputs)
                 try:
-                    labels = labels.view(-1, outputs.size()[1]).float().detach().clone().requires_grad_(True)
+                    labels = (
+                        labels.view(-1, outputs.size()[1])
+                        .float()
+                        .detach()
+                        .clone()
+                        .requires_grad_(True)
+                    )
                 except:
-                    labels = torch.tensor(list(
-                        map(lambda x: one_hot_encode(x, outputs.size()[1]), labels))).detach().clone().requires_grad_(
-                        True)
+                    labels = (
+                        torch.tensor(
+                            list(
+                                map(
+                                    lambda x: one_hot_encode(x, outputs.size()[1]),
+                                    labels,
+                                )
+                            )
+                        )
+                        .detach()
+                        .clone()
+                        .requires_grad_(True)
+                    )
 
                 outputs, labels = outputs.to(self.device), labels.to(self.device)
                 loss = criterion(outputs, labels)  # + sum_fitnesses
@@ -162,47 +196,59 @@ class MNISTClassifier(nn.Module):
                 if i % print_every == print_every - 1:
                     finish_time = time.time()
                     total_time = finish_time - start_time
-                    print('[%d, %5d] loss: %.3f accuracy: %.3f the time it took: %.3f seconds' % (
-                        epoch + 1, i + 1, running_loss / print_every, 100 * correct / total, total_time))
+                    print(
+                        "[%d, %5d] loss: %.3f accuracy: %.3f the time it took: %.3f seconds"
+                        % (
+                            epoch + 1,
+                            i + 1,
+                            running_loss / print_every,
+                            100 * correct / total,
+                            total_time,
+                        )
+                    )
                     running_loss = 0.0
                     correct = 0
                     total = 0
                     start_time = time.time()
             finish_time_epoch = time.time()
             total_time_epoch = finish_time_epoch - start_time_epoch
-            print(f'Epoch {epoch + 1} took {total_time_epoch} seconds')
+            print(f"Epoch {epoch + 1} took {total_time_epoch} seconds")
             validation_accuracy = self.validate_model()
             self.test_accuracy_list.append(validation_accuracy)
             # Save model after each epoch
             checkpoint = {
-                'epoch': epoch + 1,
-                'model_state_dict': self.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'test_accuracy_list': self.test_accuracy_list
+                "epoch": epoch + 1,
+                "model_state_dict": self.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "test_accuracy_list": self.test_accuracy_list,
             }
             directory = f"checkpoints/{self.__class__.__name__}"
-            torch.save(checkpoint, f'./{directory}/{model_name}.pth')
+            torch.save(checkpoint, f"./{directory}/{model_name}.pth")
             if validation_accuracy > best_val_accuracy:
                 best_val_accuracy = validation_accuracy
                 best_model_state_dict = {
-                    'epoch': epoch + 1,
-                    'model_state_dict': self.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'test_accuracy_list': self.test_accuracy_list
+                    "epoch": epoch + 1,
+                    "model_state_dict": self.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "test_accuracy_list": self.test_accuracy_list,
                 }
-                torch.save(best_model_state_dict, f'./{directory}/best_accuracy_{model_name}.pth')
+                torch.save(
+                    best_model_state_dict,
+                    f"./{directory}/best_accuracy_{model_name}.pth",
+                )
             print("Saved model checkpoint!")
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         print(
-            f"The maximal accuracy during training was: {max(self.test_accuracy_list)} on epoch: {self.test_accuracy_list.index(max(self.test_accuracy_list))}")
+            f"The maximal accuracy during training was: {max(self.test_accuracy_list)} on epoch: {self.test_accuracy_list.index(max(self.test_accuracy_list))}"
+        )
         # self.plot_accuracy_graph()
 
     def plot_accuracy_graph(self):
         accuracy_list = self.test_accuracy_list
         # Plotting using Seaborn
         sns.set(style="darkgrid")
-        sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker='X')
+        sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker="X")
 
         # # Add accuracy values as annotations
         # for i, accuracy in enumerate(accuracy_list):
@@ -237,7 +283,11 @@ class MNISTClassifier(nn.Module):
                     outputs = model(images)
                 else:
                     outputs = self(images)
-                images, labels, outputs = images.to(self.device), labels.to(self.device), outputs.to(self.device)
+                images, labels, outputs = (
+                    images.to(self.device),
+                    labels.to(self.device),
+                    outputs.to(self.device),
+                )
                 _, predicted = torch.max(outputs, dim=1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
@@ -252,14 +302,15 @@ class MNISTClassifier(nn.Module):
         correct = 0
         total = 0
         # Define a transform to normalize the data
-        transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Normalize((0.5,), (0.5,))])
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+        )
         # Download and load the test data
         # testset = datasets.MNIST('~/.pytorch/MNIST_data/', download=True, train=False, transform=transform)
         # testloader = DataLoader(testset, batch_size=64, shuffle=True)
         # Don't need to keep track of gradients
         self.eval()
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         with torch.no_grad():
             for images, labels in self.testloader:
                 images, labels = images.to(device), labels.to(device)

@@ -1,4 +1,5 @@
 import os
+from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -27,10 +28,12 @@ class SmallDatasetDatasetLoader(Dataset):
         for data_file_name, labels_file_name in zip(data_list, labels_list):
             data_file_path = os.path.join(self.data_dir, data_file_name)
             labels_file_path = os.path.join(self.data_dir, labels_file_name)
-            data = np.load(data_file_path, mmap_mode='r')
-            labels = np.load(labels_file_path, mmap_mode='r')
+            data = np.load(data_file_path, mmap_mode="r")
+            labels = np.load(labels_file_path, mmap_mode="r")
             data = torch.split(torch.tensor(data), split_size_or_sections=1, dim=0)
-            labels = list(torch.split(torch.tensor(labels), split_size_or_sections=1, dim=0))
+            labels = list(
+                torch.split(torch.tensor(labels), split_size_or_sections=1, dim=0)
+            )
             shape = data[0].shape
             shape_labels = labels[0].shape
             data = [x.view(-1, shape[2], shape[3], shape[4]) for x in data]
@@ -46,7 +49,9 @@ class SmallDatasetDatasetLoader(Dataset):
         """
         return len(self.tensor_list)
 
-    def add_data(self, cur_tensor_list: list[torch.Tensor], cur_label_list: list[torch.Tensor]) -> None:
+    def add_data(
+        self, cur_tensor_list: List[torch.Tensor], cur_label_list: List[torch.Tensor]
+    ) -> None:
         """
         Add additional data to the dataset.
 
@@ -57,7 +62,7 @@ class SmallDatasetDatasetLoader(Dataset):
         self.tensor_list.extend(cur_tensor_list)
         self.label_list.extend(cur_label_list)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Get a sample from the dataset at the specified index.
 

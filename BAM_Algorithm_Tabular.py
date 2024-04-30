@@ -8,12 +8,11 @@ from typing import List, Tuple, Callable
 
 import numpy as np
 import torch
-from torch import nn
 
 from Config import Config
 
 
-class BasicModelGeneticAlgorithm:
+class BasicModelGeneticAlgorithmTabular:
     """
     A model extraction method that uses genetic algorithms to reverse engineer black-box models without assumptions
     about the victim's training data. This class is tailored for extracting neural network models used in
@@ -41,15 +40,7 @@ class BasicModelGeneticAlgorithm:
         num_of_classes: int,
         model_name: str,
     ) -> None:
-        # Initialize device to CUDA if available, else CPU
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = model.to(self.device)
-
-        # Enable DataParallel if multiple GPUs are available
-        if torch.cuda.is_available():
-            num_of_gpus = torch.cuda.device_count()
-            gpu_list = list(range(num_of_gpus))
-            self.model = nn.DataParallel(self.model, device_ids=gpu_list)
+        self.model = model
 
         # Initialize query counter and loss function
         self.query_counter = 0
@@ -87,7 +78,7 @@ class BasicModelGeneticAlgorithm:
             # Evaluate the fitness of each individual in the population
             fitnesses = self.fitness(population, epsilon)
             fitness_avg = mean(fitnesses)  # Calculate average fitness for analytics
-            self.avg_fitness.append(fitness_avg)  # Store the average fitness
+            # self.avg_fitness.append(fitness_avg)  # Store the average fitness
 
             # Select the top k individuals based on their fitness
             top_k_population, top_k_population_with_fitness = self.select(
@@ -139,7 +130,7 @@ class BasicModelGeneticAlgorithm:
         max_probs, _ = torch.max(predictions_tensor, dim=1)
 
         # Ensure fitness values are non-negative by taking the maximum with zero
-        new_max_probs = torch.max(max_probs, torch.tensor(0.0, device=self.device))
+        new_max_probs = torch.max(max_probs, torch.tensor(0.0))
 
         # Convert tensor of fitness values to a list of floats for easier handling
         list_of_fitnesses = [
@@ -230,11 +221,11 @@ class BasicModelGeneticAlgorithm:
 
         # Process population in batches
         for i in range(0, num_samples, batch_size):
-            batch = torch.cat(population[i : i + batch_size], dim=0).to(self.device)
-            batch_prediction = self.model(
+            batch = torch.cat(population[i : i + batch_size], dim=0).numpy()
+            batch_prediction = self.model.predict(
                 batch
-            ).detach()  # Detach predictions to prevent gradient tracking
-            model_prediction_list.append(batch_prediction)
+            )  # Detach predictions to prevent gradient tracking
+            model_prediction_list.append(torch.Tensor(batch_prediction))
 
         # Concatenate all batch predictions into a single tensor
         model_prediction = torch.cat(model_prediction_list, dim=0)
