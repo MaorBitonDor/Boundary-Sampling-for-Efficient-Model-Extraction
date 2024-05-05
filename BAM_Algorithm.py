@@ -66,7 +66,7 @@ class BasicModelGeneticAlgorithm:
         epsilon: float,
         population_size: int,
         search_spread: float,
-    ) -> list:
+    ) -> List:
         """
         Executes the genetic algorithm over a specified number of generations, evolving the population
         towards optimal solutions as defined by the fitness function.

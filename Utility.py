@@ -116,10 +116,10 @@ def generate_random_tabular_data_rt_iot(num_samples: int) -> List[torch.Tensor]:
 
 
 def train_surrogate_model_generic(
-        dataloader: any,
+        dataloader: Any,
         num_epochs: int,
         model_class: classmethod,
-        criterion: any,
+        criterion: Any,
         optimizer_name: str = "AdamW",
 ) -> "SurrogateModel":
     """
@@ -192,7 +192,7 @@ def create_config() -> None:
 def BAM_main_algorithm(
         model: "VictimModel",
         model_class: classmethod,
-        criterion: any,
+        criterion: Any,
         random_data_generator_function: Callable,
         num_of_classes: int,
         k: int = 300,
@@ -251,7 +251,7 @@ def BAM_main_algorithm(
             not os.path.exists(file_path_confidence_batch)
             or Config.instance["dont_get_from_disk"]
     ):
-        best_individuals1 = ga.run_genetic_algorithm(
+        ga.run_genetic_algorithm(
             generations, k, epsilon, population_size, search_spread
         )
         if torch.cuda.is_available():
@@ -276,42 +276,42 @@ def BAM_main_algorithm(
     surrogate_model = train_surrogate_model_generic(
         dataloader, epochs, model_class, criterion, optimizer_name=optimizer_name
     )
-    surrogate_model.validate_model()
-    model_acc = surrogate_model.test_model()
-
-    attack_success_rate = test_trans(
-        surrogate_model, model, criterion, num_of_classes, model.testloader
-    )
-    print(attack_success_rate)
-    # Save model after each epoch
-
-    if surrogate_model.__class__.__name__ == "DataParallel":
-        checkpoint = {"model_state_dict": surrogate_model.module.state_dict()}
-    else:
-        checkpoint = {
-            "model_state_dict": surrogate_model.state_dict(),
-        }
-    if save_path is None:
-        model_name = "phase1"
-        directory = f"checkpoints/phases_tests/{surrogate_model.__class__.__name__}"
-    else:
-        model_name = save_path
-        directory = f"checkpoints/model_test/{surrogate_model.__class__.__name__}"
-
-    # Check if the directory exists
-    if not os.path.exists(directory):
-        # Create the directory
-        os.makedirs(directory)
-        print(f"Directory '{directory}' created.")
-    torch.save(checkpoint, f"./{directory}/{model_name}.pth")
-    # del proxy_dataset
-    del surrogate_model
-    del dataset
-    # release all GPU memory
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    return model_acc, attack_success_rate
-
+    # surrogate_model.validate_model()
+    # model_acc = surrogate_model.test_model()
+    #
+    # attack_success_rate = test_trans(
+    #     surrogate_model, model, criterion, num_of_classes, model.testloader
+    # )
+    # print(attack_success_rate)
+    # # Save model after each epoch
+    #
+    # if surrogate_model.__class__.__name__ == "DataParallel":
+    #     checkpoint = {"model_state_dict": surrogate_model.module.state_dict()}
+    # else:
+    #     checkpoint = {
+    #         "model_state_dict": surrogate_model.state_dict(),
+    #     }
+    # if save_path is None:
+    #     model_name = "phase1"
+    #     directory = f"checkpoints/phases_tests/{surrogate_model.__class__.__name__}"
+    # else:
+    #     model_name = save_path
+    #     directory = f"checkpoints/model_test/{surrogate_model.__class__.__name__}"
+    #
+    # # Check if the directory exists
+    # if not os.path.exists(directory):
+    #     # Create the directory
+    #     os.makedirs(directory)
+    #     print(f"Directory '{directory}' created.")
+    # torch.save(checkpoint, f"./{directory}/{model_name}.pth")
+    # # del proxy_dataset
+    # del surrogate_model
+    # del dataset
+    # # release all GPU memory
+    # if torch.cuda.is_available():
+    #     torch.cuda.empty_cache()
+    # return model_acc, attack_success_rate
+    return surrogate_model
 
 def BAM_main_algorithm_tabular(
         model: "VictimModel",
@@ -371,7 +371,7 @@ def BAM_main_algorithm_tabular(
             not os.path.exists(file_path_confidence_batch)
             or Config.instance["dont_get_from_disk"]
     ):
-        best_individuals1 = ga.run_genetic_algorithm(
+        ga.run_genetic_algorithm(
             generations, k, epsilon, population_size, search_spread
         )
         print(f"The number of queries was: {ga.query_counter}")
@@ -403,41 +403,8 @@ def BAM_main_algorithm_tabular(
     )
     surrogate_model = train_surrogate_model_generic_tabular(X, y, model_class)
     # surrogate_model.validate_model()
-    model_acc = surrogate_model.test_model()
-    #
-    # attack_success_rate = test_trans(surrogate_model, model, criterion, num_of_classes, model.testloader)
-    # print(attack_success_rate)
-    # # Save model after each epoch
-    #
-    # if surrogate_model.__class__.__name__ == 'DataParallel':
-    #     checkpoint = {
-    #         'model_state_dict': surrogate_model.module.state_dict()
-    #     }
-    # else:
-    #     checkpoint = {
-    #         'model_state_dict': surrogate_model.state_dict(),
-    #     }
-    # if save_path is None:
-    #     model_name = "phase1"
-    #     directory = f"checkpoints/phases_tests/{surrogate_model.__class__.__name__}"
-    # else:
-    #     model_name = save_path
-    #     directory = f"checkpoints/model_test/{surrogate_model.__class__.__name__}"
-    #
-    # # Check if the directory exists
-    # if not os.path.exists(directory):
-    #     # Create the directory
-    #     os.makedirs(directory)
-    #     print(f"Directory '{directory}' created.")
-    # torch.save(checkpoint, f'./{directory}/{model_name}.pth')
-    # # del proxy_dataset
-    # del surrogate_model
-    # del dataset
-    # # release all GPU memory
-    # if torch.cuda.is_available():
-    #     torch.cuda.empty_cache()
-    # return model_acc, attack_success_rate
-
+    # model_acc = surrogate_model.test_model()
+    return surrogate_model
 
 def prepare_config_and_log() -> None:
     """
