@@ -1,3 +1,11 @@
 *.pkl
 *.json
 *.log
+/Adults/
+/checkpoints/
+/CovType/
+/data/
+/Defenses/
+/nsl-kdd/
+/RT_IoT/
+/Defenses/

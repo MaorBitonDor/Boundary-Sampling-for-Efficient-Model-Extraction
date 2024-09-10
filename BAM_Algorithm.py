@@ -87,7 +87,6 @@ class BasicModelGeneticAlgorithm:
             # Evaluate the fitness of each individual in the population
             fitnesses = self.fitness(population, epsilon)
             fitness_avg = mean(fitnesses)  # Calculate average fitness for analytics
-            self.avg_fitness.append(fitness_avg)  # Store the average fitness
 
             # Select the top k individuals based on their fitness
             top_k_population, top_k_population_with_fitness = self.select(

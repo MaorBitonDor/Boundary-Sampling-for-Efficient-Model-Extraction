@@ -84,7 +84,7 @@ class Config:
         parser.add_argument(
             "--file_path_confidence_batch",
             type=str,
-            default="{destination_folder}/Away_proxy_dataset_confidence_{generations}_batch_0_input.npy",
+            default="{destination_folder}/Toward_proxy_dataset_confidence_{generations}_batch_{gen_minus_one}_input.npy",
             help="File path confidence batch",
         )
 

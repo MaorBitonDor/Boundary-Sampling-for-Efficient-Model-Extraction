@@ -1,140 +1,97 @@
 import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch
 import torch.nn as nn
-import torch.nn.parallel
-from Config import Config
-from Utility import prepare_for_training
+from matplotlib import pyplot as plt
+from torch import optim
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import models, transforms, datasets
 
+from Config import Config
 from MNISTClassifier import one_hot_encode
+from Utility import prepare_for_training, prepare_config_and_log
 
 
-class Alexnet(nn.Module):
-    def __init__(self, name="surrogate_model", n_outputs=10):
-        super(Alexnet, self).__init__()
+# Define the CNN model
+class TinyImagenteClassifier(nn.Module):
+    def __init__(self, num_classes=200, model_type="resnet18"):
+        super(TinyImagenteClassifier, self).__init__()
+        # resnet = models.resnet50(weights=None)
+        self.image_size = 64
+        if model_type == "resnet50":
+            backbone = models.resnet50(
+                pretrained=False
+            )  # Set pretrained to True if needed
+        elif model_type == "resnet50_pretrained":
+            backbone = models.resnet50(pretrained=True)
+        elif model_type == "resnet18_pretrained":
+            backbone = models.resnet18(pretrained=True)
+        elif model_type == "resnet18":
+            backbone = models.resnet18(pretrained=False)
+        else:
+            backbone = models.resnet101(
+                pretrained=False
+            )  # Set pretrained to True if needed
+        # Remove the fully connected layers at the end
+        self.features = nn.Sequential(*list(backbone.children())[:-2])
 
-        self.name = name
-        self.num_classes = n_outputs
+        # Add adaptive pooling instead of fixed size
+        self.global_avg_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.conv1 = nn.Conv2d(3, 48, 5, stride=1, padding=2)
-        self.conv1.bias.data.normal_(0, 0.01)
-        self.conv1.bias.data.fill_(0)
-
-        self.relu = nn.ReLU()
-        self.lrn = nn.LocalResponseNorm(2)
-        self.pad = nn.MaxPool2d(3, stride=2)
-
-        self.batch_norm1 = nn.BatchNorm2d(48, eps=0.001)
-
-        self.conv2 = nn.Conv2d(48, 128, 5, stride=1, padding=2)
-        self.conv2.bias.data.normal_(0, 0.01)
-        self.conv2.bias.data.fill_(1.0)
-
-        self.batch_norm2 = nn.BatchNorm2d(128, eps=0.001)
-
-        self.conv3 = nn.Conv2d(128, 192, 3, stride=1, padding=1)
-        self.conv3.bias.data.normal_(0, 0.01)
-        self.conv3.bias.data.fill_(0)
-
-        self.batch_norm3 = nn.BatchNorm2d(192, eps=0.001)
-
-        self.conv4 = nn.Conv2d(192, 192, 3, stride=1, padding=1)
-        self.conv4.bias.data.normal_(0, 0.01)
-        self.conv4.bias.data.fill_(1.0)
-
-        self.batch_norm4 = nn.BatchNorm2d(192, eps=0.001)
-
-        self.conv5 = nn.Conv2d(192, 128, 3, stride=1, padding=1)
-        self.conv5.bias.data.normal_(0, 0.01)
-        self.conv5.bias.data.fill_(1.0)
-
-        self.batch_norm5 = nn.BatchNorm2d(128, eps=0.001)
-
-        self.fc1 = nn.Linear(1152, 512)
-        self.fc1.bias.data.normal_(0, 0.01)
-        self.fc1.bias.data.fill_(0)
-
-        self.drop = nn.Dropout(p=0.5)
-
-        self.batch_norm6 = nn.BatchNorm1d(512, eps=0.001)
-
-        self.fc2 = nn.Linear(512, 256)
-        self.fc2.bias.data.normal_(0, 0.01)
-        self.fc2.bias.data.fill_(0)
-
-        self.batch_norm7 = nn.BatchNorm1d(256, eps=0.001)
-
-        self.fc3 = nn.Linear(256, 10)
-        self.fc3.bias.data.normal_(0, 0.01)
-        self.fc3.bias.data.fill_(0)
-
-        self.soft = nn.Softmax()
+        # Add a fully connected layer with the desired number of output classes
+        num_ftrs = backbone.fc.in_features
+        self.fc = nn.Linear(num_ftrs, num_classes)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Define transforms for data augmentation
+        train_transform = transforms.Compose(
+            [
+                transforms.Resize(self.image_size),
+                transforms.CenterCrop(self.image_size),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
+
+        # Load the training dataset
+        prepare_config_and_log()
+        batch_size = Config.instance["batch_size"]
+        train_dir = "data/TinyImagenet/tiny-imagenet-200/train"
+        valid_dir = "data/TinyImagenet/tiny-imagenet-200/test"
+        train_dataset = datasets.ImageFolder(root=train_dir, transform=train_transform)
+        self.train_loader = DataLoader(
+            dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=16
+        )
         self.test_accuracy_list = []
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+        # Load the validation dataset
+        valid_transform = transforms.Compose(
+            [
+                transforms.Resize(self.image_size),
+                transforms.CenterCrop(self.image_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
         )
-        testset = datasets.CIFAR10(
-            root="./data", train=False, download=True, transform=transform
+
+        self.valid_dataset = datasets.ImageFolder(
+            root=valid_dir, transform=valid_transform
         )
-        self.testloader = DataLoader(testset, batch_size=512, shuffle=False)
-        # file_path_test = "CIFAR10_testset"
-        # if not os.path.exists(file_path_test):
-        #     # Define a transform to normalize the data
-        #     transform = transforms.Compose([transforms.ToTensor(),
-        #                                     transforms.Normalize((0.5,), (0.5,))])
-        #     # Download and load the test data
-        #     testset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-        #     self.testloader = DataLoader(testset, batch_size=512, shuffle=False)
-        #     torch.save(testset, file_path_test)
-        # else:
-        #     testset = torch.load(file_path_test)
-        #     self.testloader = DataLoader(testset, batch_size=512, shuffle=False)
+        self.testloader = DataLoader(
+            dataset=self.valid_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=16,
+        )
 
     def forward(self, x):
-        if isinstance(x, np.ndarray):
-            # Convert NumPy array to PyTorch tensor
-            x = torch.tensor(x)
-        x = x.to(self.device)
-        layer1 = self.batch_norm1(self.pad(self.lrn(self.relu(self.conv1(x)))))
-        layer2 = self.batch_norm2(self.pad(self.lrn(self.relu(self.conv2(layer1)))))
-        layer3 = self.batch_norm3(self.relu(self.conv3(layer2)))
-        layer4 = self.batch_norm4(self.relu(self.conv4(layer3)))
-        layer5 = self.batch_norm5(self.pad(self.relu(self.conv5(layer4))))
-        flatten = layer5.view(-1, 128 * 3 * 3)
-        fully1 = self.relu(self.fc1(flatten))
-        fully1 = self.batch_norm6(self.drop(fully1))
-        fully2 = self.relu(self.fc2(fully1))
-        fully2 = self.batch_norm7(self.drop(fully2))
-        logits = self.fc3(fully2)
-        # softmax_val = self.soft(logits)
-        # del x
-        return logits
-
-    def real_forward(self, x):
-        if isinstance(x, np.ndarray):
-            # Convert NumPy array to PyTorch tensor
-            x = torch.tensor(x)
-        x = x.to(self.device)
-        layer1 = self.batch_norm1(self.pad(self.lrn(self.relu(self.conv1(x)))))
-        layer2 = self.batch_norm2(self.pad(self.lrn(self.relu(self.conv2(layer1)))))
-        layer3 = self.batch_norm3(self.relu(self.conv3(layer2)))
-        layer4 = self.batch_norm4(self.relu(self.conv4(layer3)))
-        layer5 = self.batch_norm5(self.pad(self.relu(self.conv5(layer4))))
-        flatten = layer5.view(-1, 128 * 3 * 3)
-        fully1 = self.relu(self.fc1(flatten))
-        fully1 = self.batch_norm6(self.drop(fully1))
-        fully2 = self.relu(self.fc2(fully1))
-        fully2 = self.batch_norm7(self.drop(fully2))
-        logits = self.fc3(fully2)
-        # softmax_val = self.soft(logits)
-        # del x
-        return logits
+        x = self.features(x)
+        x = self.global_avg_pooling(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
 
     def train_model(
         self,
@@ -143,19 +100,39 @@ class Alexnet(nn.Module):
         optimizer,
         n_epochs=10,
         print_every=500,
-        model_name="Alexnet_model",
+        model_name="TinyImagnet_model",
     ):
         model, best_val_accuracy, best_model_state_dict, start_epoch = (
             prepare_for_training(self, model_name, optimizer)
         )
+        # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i for i in range(100, 300, 50)],
+        #                                                     last_epoch=-1)
+        # lr_scheduler = self.lr_scheduler(n_epochs, 1, 0., 0.1)
         for epoch in range(start_epoch, n_epochs):
             running_loss = 0.0
             correct = 0
             total = 0
             start_time = time.time()
             start_time_epoch = time.time()
+            # Manually clip the learning rate to a lower limit
+            # lower_limit = 1e-5
+            # for param_group in optimizer.param_groups:
+            #     param_group['lr'] = max(param_group['lr'], lower_limit)
+            # if epoch == 5:
+            #     batch_size = 512
+            #     train_loader = DataLoader(
+            #         train_loader.dataset,
+            #         batch_size=batch_size,
+            #         shuffle=False,
+            #         pin_memory=True,
+            #         num_workers=16,
+            #     )
             for i, (inputs, labels) in enumerate(train_loader, 0):
-                inputs = inputs.view(inputs.shape[0], 3, 32, 32).detach().clone()
+                inputs = (
+                    inputs.view(inputs.shape[0], 3, self.image_size, self.image_size)
+                    .detach()
+                    .clone()
+                )
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 if torch.cuda.is_available():
                     outputs = model(inputs)
@@ -184,13 +161,11 @@ class Alexnet(nn.Module):
                         .requires_grad_(True)
                     )
 
-                # # Get the maximum values along the third dimension (dimension with size 10)
-                # fitnesses, _ = torch.max(labels_copy, dim=2)
-                # # Sum all the elements in the tensor to get a scalar
-                # sum_fitnesses = torch.sum(torch.max(-torch.log(fitnesses), torch.tensor(100))).requires_grad_()
                 outputs, labels = outputs.to(self.device), labels.to(self.device)
+                # outputs *= 1e2
                 loss = criterion(outputs, labels)  # + sum_fitnesses
-
+                # lr = lr_scheduler(epoch + (i + 1) / len(train_loader))
+                # optimizer.param_groups[0].update(lr=lr)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -221,11 +196,12 @@ class Alexnet(nn.Module):
                     start_time = time.time()
             finish_time_epoch = time.time()
             total_time_epoch = finish_time_epoch - start_time_epoch
-            print(f"Epoch {epoch + 1} took {total_time_epoch} seconds")
-            validation_accuracy = self.validate_model()
-            Config.log.info(
-                f"Epoch {epoch + 1} took {total_time_epoch} seconds, Accuracy on test set is: {validation_accuracy}"
+            # lr_scheduler(epoch)
+            learning_rate = optimizer.param_groups[0]["lr"]
+            print(
+                f"Epoch {epoch + 1} took {total_time_epoch:.3f} seconds, Learning rate: {learning_rate}"
             )
+            validation_accuracy = self.validate_model()
             self.test_accuracy_list.append(validation_accuracy)
             # Save model after each epoch
             checkpoint = {
@@ -279,6 +255,7 @@ class Alexnet(nn.Module):
 
     def validate_model(self):
         # Test the model
+        # self.eval()
         correct = 0
         total = 0
         model = None
@@ -287,9 +264,20 @@ class Alexnet(nn.Module):
             gpu_list = list(range(num_of_gpus))
             model = nn.DataParallel(self, device_ids=gpu_list).to(self.device)
         # Don't need to keep track of gradients
+        batch_size = Config.instance["batch_size"]
+        testloader = DataLoader(
+            dataset=self.valid_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=16,
+        )
         with torch.no_grad():
-            for images, labels in self.testloader:
-                images = images.view(images.shape[0], 3, 32, 32).detach().clone()
+            for images, labels in testloader:
+                images = (
+                    images.view(images.shape[0], 3, self.image_size, self.image_size)
+                    .detach()
+                    .clone()
+                )
                 if torch.cuda.is_available():
                     outputs = model(images)
                 else:
@@ -303,25 +291,39 @@ class Alexnet(nn.Module):
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        print(f"Accuracy on test set is: {100 * correct / total}")
+        print(f"Accuracy on test set is: {100 * correct / total:.3f}%")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        # self.train(True)
         return correct / total
 
     def test_model(self):
-        # Test the model
+        self.eval()
         correct = 0
         total = 0
-        self.eval()
+        test_loss = 0
         model = None
         if torch.cuda.is_available():
             num_of_gpus = torch.cuda.device_count()
             gpu_list = list(range(num_of_gpus))
             model = nn.DataParallel(self, device_ids=gpu_list).to(self.device)
         # Don't need to keep track of gradients
+        # batch_size = 64
+        prepare_config_and_log()
+        batch_size = Config.instance["batch_size"]
+        testloader = DataLoader(
+            dataset=self.valid_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=16,
+        )
         with torch.no_grad():
-            for images, labels in self.testloader:
-                images = images.view(images.shape[0], 3, 32, 32).detach().clone()
+            for images, labels in testloader:
+                images = (
+                    images.view(images.shape[0], 3, self.image_size, self.image_size)
+                    .detach()
+                    .clone()
+                )
                 if torch.cuda.is_available():
                     outputs = model(images)
                 else:
@@ -331,12 +333,36 @@ class Alexnet(nn.Module):
                     labels.to(self.device),
                     outputs.to(self.device),
                 )
+                loss = nn.CrossEntropyLoss()(outputs, labels)
+                test_loss += loss.item() * labels.size(0)
                 _, predicted = torch.max(outputs, dim=1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        print(f"Accuracy on test set is: {100 * correct / total}")
+        print(f"Accuracy on test set is: {100 * correct / total}%")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        self.train()
-        return correct / total
+        self.train(True)
+        return test_loss / total, correct / total
+
+    def step_lr(self, lr_max, epoch, num_epochs):
+        """Step Scheduler"""
+        ratio = epoch / float(num_epochs)
+        if ratio < 0.3:
+            return lr_max
+        elif ratio < 0.6:
+            return lr_max * 0.2
+        elif ratio < 0.8:
+            return lr_max * 0.2 * 0.2
+        else:
+            return lr_max * 0.2 * 0.2 * 0.2
+
+    def lr_scheduler(self, epochs, lr_mode, lr_min, lr_max):
+        """Learning Rate Scheduler Options"""
+        if lr_mode == 1:
+            lr_schedule = lambda t: np.interp(
+                [t], [0, epochs // 2, epochs], [lr_min, lr_max, lr_min]
+            )[0]
+        elif lr_mode == 0:
+            lr_schedule = lambda t: self.step_lr(lr_max, t, epochs)
+        return lr_schedule
