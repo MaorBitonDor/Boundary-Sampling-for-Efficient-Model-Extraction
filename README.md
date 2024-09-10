@@ -1,5 +1,5 @@
-# Evolutionary Model Extraction Algorithm
-
+# Boundary Sampling for Efficient Model Extraction
+## Overview
 This repository contains an implementation of a model extraction algorithm that harnesses the power of evolutionary algorithms to efficiently extract the victim model with zero assumptions on the victim model training data. The algorithm is designed to extract black box models by only querying the model and sending input and receiving the output.
 
 **[Link to Paper](insert_paper_link_here)**
