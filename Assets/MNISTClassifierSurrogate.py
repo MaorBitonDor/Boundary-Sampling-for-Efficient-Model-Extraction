@@ -9,7 +9,7 @@ from torchvision import transforms
 from torchvision.datasets import FashionMNIST
 
 from MNISTClassifier import one_hot_encode
-from Utility import prepare_for_training
+from BAM_Code.Utility import prepare_for_training
 
 
 class MNISTClassifierSurrogate(nn.Module):
@@ -84,7 +84,6 @@ class MNISTClassifierSurrogate(nn.Module):
             start_time_epoch = time.time()
             for i, (inputs, labels) in enumerate(train_loader, 0):
                 inputs = inputs.view(inputs.shape[0], 1, 28, 28).detach().clone()
-                # inputs = inputs.view(inputs.shape[0], -1).detach().clone()
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 if torch.cuda.is_available():
@@ -175,7 +174,6 @@ class MNISTClassifierSurrogate(nn.Module):
         print(
             f"The maximal accuracy during training was: {max(self.test_accuracy_list)} on epoch: {self.test_accuracy_list.index(max(self.test_accuracy_list))}"
         )
-        # self.plot_accuracy_graph()
 
     def plot_accuracy_graph(self):
         accuracy_list = self.test_accuracy_list
@@ -183,17 +181,10 @@ class MNISTClassifierSurrogate(nn.Module):
         sns.set(style="darkgrid")
         sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker="X")
 
-        # # Add accuracy values as annotations
-        # for i, accuracy in enumerate(accuracy_list):
-        #     plt.annotate(f"{accuracy:.2f}", (i, accuracy), textcoords="offset points", xytext=(0, 10), ha='center')
-
         # Set labels and title
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy")
         plt.title("Accuracy Over Epochs")
-
-        # Set x-axis ticks as integers
-        # plt.xticks(range(len(accuracy_list)))
 
         # Display the plot
         plt.show()

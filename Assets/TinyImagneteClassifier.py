@@ -5,13 +5,12 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import models, transforms, datasets
 
-from Config import Config
-from MNISTClassifier import one_hot_encode
-from Utility import prepare_for_training, prepare_config_and_log
+from BAM_Code.Config import Config
+from Assets.MNISTClassifier import one_hot_encode
+from BAM_Code.Utility import prepare_for_training, prepare_config_and_log
 
 
 # Define the CNN model
@@ -59,8 +58,8 @@ class TinyImagenteClassifier(nn.Module):
         # Load the training dataset
         prepare_config_and_log()
         batch_size = Config.instance["batch_size"]
-        train_dir = "data/TinyImagenet/tiny-imagenet-200/train"
-        valid_dir = "data/TinyImagenet/tiny-imagenet-200/test"
+        train_dir = "../data/TinyImagenet/tiny-imagenet-200/train"
+        valid_dir = "../data/TinyImagenet/tiny-imagenet-200/test"
         train_dataset = datasets.ImageFolder(root=train_dir, transform=train_transform)
         self.train_loader = DataLoader(
             dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=16
@@ -105,28 +104,13 @@ class TinyImagenteClassifier(nn.Module):
         model, best_val_accuracy, best_model_state_dict, start_epoch = (
             prepare_for_training(self, model_name, optimizer)
         )
-        # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i for i in range(100, 300, 50)],
-        #                                                     last_epoch=-1)
-        # lr_scheduler = self.lr_scheduler(n_epochs, 1, 0., 0.1)
         for epoch in range(start_epoch, n_epochs):
             running_loss = 0.0
             correct = 0
             total = 0
             start_time = time.time()
             start_time_epoch = time.time()
-            # Manually clip the learning rate to a lower limit
-            # lower_limit = 1e-5
-            # for param_group in optimizer.param_groups:
-            #     param_group['lr'] = max(param_group['lr'], lower_limit)
-            # if epoch == 5:
-            #     batch_size = 512
-            #     train_loader = DataLoader(
-            #         train_loader.dataset,
-            #         batch_size=batch_size,
-            #         shuffle=False,
-            #         pin_memory=True,
-            #         num_workers=16,
-            #     )
+
             for i, (inputs, labels) in enumerate(train_loader, 0):
                 inputs = (
                     inputs.view(inputs.shape[0], 3, self.image_size, self.image_size)
@@ -162,10 +146,7 @@ class TinyImagenteClassifier(nn.Module):
                     )
 
                 outputs, labels = outputs.to(self.device), labels.to(self.device)
-                # outputs *= 1e2
-                loss = criterion(outputs, labels)  # + sum_fitnesses
-                # lr = lr_scheduler(epoch + (i + 1) / len(train_loader))
-                # optimizer.param_groups[0].update(lr=lr)
+                loss = criterion(outputs, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -196,7 +177,6 @@ class TinyImagenteClassifier(nn.Module):
                     start_time = time.time()
             finish_time_epoch = time.time()
             total_time_epoch = finish_time_epoch - start_time_epoch
-            # lr_scheduler(epoch)
             learning_rate = optimizer.param_groups[0]["lr"]
             print(
                 f"Epoch {epoch + 1} took {total_time_epoch:.3f} seconds, Learning rate: {learning_rate}"
@@ -238,24 +218,15 @@ class TinyImagenteClassifier(nn.Module):
         sns.set(style="darkgrid")
         sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker="X")
 
-        # # Add accuracy values as annotations
-        # for i, accuracy in enumerate(accuracy_list):
-        #     plt.annotate(f"{accuracy:.2f}", (i, accuracy), textcoords="offset points", xytext=(0, 10), ha='center')
-
         # Set labels and title
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy")
         plt.title("Accuracy Over Epochs")
 
-        # Set x-axis ticks as integers
-        # plt.xticks(range(len(accuracy_list)))
-
         # Display the plot
         plt.show()
 
     def validate_model(self):
-        # Test the model
-        # self.eval()
         correct = 0
         total = 0
         model = None
@@ -294,7 +265,6 @@ class TinyImagenteClassifier(nn.Module):
         print(f"Accuracy on test set is: {100 * correct / total:.3f}%")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        # self.train(True)
         return correct / total
 
     def test_model(self):
@@ -307,8 +277,6 @@ class TinyImagenteClassifier(nn.Module):
             num_of_gpus = torch.cuda.device_count()
             gpu_list = list(range(num_of_gpus))
             model = nn.DataParallel(self, device_ids=gpu_list).to(self.device)
-        # Don't need to keep track of gradients
-        # batch_size = 64
         prepare_config_and_log()
         batch_size = Config.instance["batch_size"]
         testloader = DataLoader(

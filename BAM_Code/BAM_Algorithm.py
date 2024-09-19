@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from Config import Config
+from BAM_Code.Config import Config
 
 
 class BasicModelGeneticAlgorithm:

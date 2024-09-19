@@ -9,7 +9,7 @@ from typing import List, Tuple, Callable
 import numpy as np
 import torch
 
-from Config import Config
+from BAM_Code.Config import Config
 
 
 class BasicModelGeneticAlgorithmTabular:

@@ -10,7 +10,11 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from ucimlrepo import fetch_ucirepo
 
-from Utility import create_train_test_sets, preprocess_income, preprocess_nsl_kdd
+from BAM_Code.Utility import (
+    create_train_test_sets,
+    preprocess_income,
+    preprocess_nsl_kdd,
+)
 
 
 class BaseModel:
@@ -18,7 +22,6 @@ class BaseModel:
         self.model = None
         self.preprocessor = None
         self.params = {}
-        # self.feature_names = None
 
     def fit_preprocessor(self, X):
         self.preprocessor.fit(X)
@@ -30,20 +33,14 @@ class BaseModel:
     def train_model(self, X, y):
         print("Start Training...")
 
-        # Ensure categorical columns are of type 'category'
-        # X = self._convert_categorical_columns(X)
-
         # Create DMatrix
         dtrain = xgb.DMatrix(X, label=y)
-        self.model = xgb.train(self.params, dtrain, num_boost_round=100)
-        # self.feature_names = X.columns.tolist()  # Save the feature names
+        self.model = xgb.train(
+            self.params, dtrain, num_boost_round=100
+        )  # Save the feature names
         print("Finished Training...")
 
     def predict(self, X):
-        # Ensure categorical columns are of type 'category'
-        # X = self._convert_categorical_columns(X)
-        # X = X[self.feature_names]
-
         dtest = xgb.DMatrix(X)
         return self.model.predict(dtest)
 
@@ -110,8 +107,8 @@ class AdultModel(BaseModel):
             "device": "cuda",
             "tree_method": "hist",
         }
-        self.train_file = "Adults/adults_train_set.csv"
-        self.test_file = "Adults/adults_test_set.csv"
+        self.train_file = "../Adults/adults_train_set.csv"
+        self.test_file = "../Adults/adults_test_set.csv"
         self.adult_url = (
             "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"
         )
@@ -209,8 +206,8 @@ class RTIoTModel(BaseModel):
             "device": "cuda",
             "tree_method": "hist",
         }
-        self.train_file = "RT_IoT/rt_iot2022_train_set.csv"
-        self.test_file = "RT_IoT/rt_iot2022_test_set.csv"
+        self.train_file = "../RT_IoT/rt_iot2022_train_set.csv"
+        self.test_file = "../RT_IoT/rt_iot2022_test_set.csv"
         self.target_name = "Attack_type"
 
     def validate_model(self, X_test, y_test):
@@ -229,8 +226,6 @@ class RTIoTModel(BaseModel):
             retrieval_type="fetch",
         )
         self.fit_preprocessor(X_test)
-        # self.fit_preprocessor(X_train)
-        # X_test_preprocessed = self.preprocess(X_test)
         return self.validate_model(X_test, y_test)
 
 
@@ -355,22 +350,8 @@ class NSLKDDModel(BaseModel):
             "learning_rate": 0.25,
             "gamma": 0,
             "device": "cuda",
-            "tree_method": "hist"
+            "tree_method": "hist",
         }
-
-        # # Initial parameters for the XGBoost model
-        # self.params = {
-        #     "objective": "multi:softprob",
-        #     "num_class": 23,  # NSL-KDD has 23 classes (Normal, DoS, Probe, R2L, U2R, etc.)
-        #     "eval_metric": "mlogloss",
-        #     "colsample_bytree": 1.0,
-        #     "learning_rate": 0.25,
-        #     "max_depth": 20,
-        #     "min_child_weight": 1,
-        #     "subsample": 0.8,
-        #     "device": "cuda",
-        #     "tree_method": "hist",
-        # }
 
     def load_dataset(self):
         # Load the dataset from the nsl-kdd folder
@@ -408,8 +389,8 @@ class NSLKDDModel(BaseModel):
         return X_train, X_test, y_train, y_test
 
     def read_data(self):
-        train_data = pd.read_csv("nsl-kdd/KDDTrain+.txt", header=None)
-        test_data = pd.read_csv("nsl-kdd/KDDTest+.txt", header=None)
+        train_data = pd.read_csv("../nsl-kdd/KDDTrain+.txt", header=None)
+        test_data = pd.read_csv("../nsl-kdd/KDDTest+.txt", header=None)
 
         columns = [
             "duration",
@@ -460,8 +441,8 @@ class NSLKDDModel(BaseModel):
         train_data.columns = columns
         test_data.columns = columns
 
-        train_data.loc[train_data['outcome'] == "normal", "outcome"] = 'normal'
-        test_data.loc[test_data['outcome'] != 'normal', "outcome"] = 'attack'
+        train_data.loc[train_data["outcome"] == "normal", "outcome"] = "normal"
+        test_data.loc[test_data["outcome"] != "normal", "outcome"] = "attack"
 
         # Separate features and labels
         X_train = train_data.iloc[:, :-1]
@@ -490,7 +471,6 @@ class NSLKDDModel(BaseModel):
         print("Preprocessor fitted.")
 
     def validate_model(self, X_test, y_test):
-        # X_test_preprocessed = self.preprocess(X_test)
         preds = self.predict(X_test)
         preds = np.argmax(preds, axis=1)
         acc = accuracy_score(y_test, preds)
@@ -499,14 +479,11 @@ class NSLKDDModel(BaseModel):
 
     def test_model(self):
         X_train, X_test, y_train, y_test = self.load_dataset()
-        # X_test = self._convert_categorical_columns(X_test)
         self.fit_preprocessor(X_train)
         X_test_preprocessed = self.preprocess(X_test)
         return self.validate_model(X_test_preprocessed, y_test)
 
     def tune_hyperparameters(self, X_train, y_train):
-        # Ensure categorical columns are of type 'category'
-        # X_train = self._convert_categorical_columns(X_train)
 
         param_grid = {
             "max_depth": [20],
@@ -523,7 +500,6 @@ class NSLKDDModel(BaseModel):
             use_label_encoder=False,
             tree_method="hist",
             gpu_id=0,
-            # enable_categorical=True,  # Enable categorical data handling
         )
 
         grid_search = GridSearchCV(
@@ -533,135 +509,3 @@ class NSLKDDModel(BaseModel):
 
         self.params.update(grid_search.best_params_)
         print("Best parameters found: ", grid_search.best_params_)
-
-    # def _convert_categorical_columns(self, df):
-    #     categorical_columns = df.select_dtypes(include=["object"]).columns
-    #     for col in categorical_columns:
-    #         df[col] = df[col].astype("category")
-    #     return df
-
-
-# def main():
-#     train_file = "RT_IoT/rt_iot2022_train_set.csv"
-#     test_file = "RT_IoT/rt_iot2022_test_set.csv"
-#     target_name = "Attack_type"
-#     X_train, X_test, y_train, y_test = create_train_test_sets(
-#         data_link=942,
-#         train_file=train_file,
-#         test_file=test_file,
-#         target_name=target_name,
-#         retrieval_type="fetch",
-#     )
-#     print(f"Training set size: {X_train.shape[0]} samples")
-#     print(f"Test set size: {X_test.shape[0]} samples")
-#
-#     model = RTIoTModel()
-#     # model.fit_preprocessor(X_train)
-#
-#     model.train_model(X_train.values, y_train.values)
-#
-#     probs = model.predict(
-#         X_test.values
-#     )  # This will output the probabilities for each class
-#     predicted_classes = np.argmax(probs, axis=1)
-#     # Calculate the accuracy
-#     accuracy = np.mean(predicted_classes == y_test)
-#     print("Prediction Accuracy:", accuracy)
-#
-#     model_path = "rt_iot_xgb_model.json"
-#     preprocessor_path = "rt_iot_preprocessor.pkl"
-#
-#     model.save(model_path, preprocessor_path=preprocessor_path)
-#
-#     # train_file = "Adults/adults_train_set.csv"
-#     # test_file = "Adults/adults_test_set.csv"
-#     # adult_url = (
-#     #     "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"
-#     # )
-#     # adult_columns = [
-#     #     "age",
-#     #     "workclass",
-#     #     "fnlwgt",
-#     #     "education",
-#     #     "education-num",
-#     #     "marital-status",
-#     #     "occupation",
-#     #     "relationship",
-#     #     "race",
-#     #     "sex",
-#     #     "capital-gain",
-#     #     "capital-loss",
-#     #     "hours-per-week",
-#     #     "native-country",
-#     #     "income",
-#     # ]
-#     # adult_target = "income"
-#     # X_train_adult, X_test_adult, y_train_adult, y_test_adult = (
-#     #     create_train_test_sets(
-#     #         adult_url,
-#     #         train_file,
-#     #         test_file,
-#     #         adult_target,
-#     #         adult_columns,
-#     #         na_values="?",
-#     #         preprocess_target=preprocess_income,
-#     #     )
-#     # )
-#     # print(f"Training set size: {X_train_adult.shape[0]} samples")
-#     # print(f"Test set size: {X_test_adult.shape[0]} samples")
-#     #
-#     # adult_model = AdultModel()
-#     # adult_model.preprocessor.fit(X_train_adult)
-#     # X_train_adult_preprocessed = adult_model.preprocess(X_train_adult)
-#     # X_test_adult_preprocessed = adult_model.preprocess(X_test_adult)
-#     #
-#     # adult_model.train_model(X_train_adult_preprocessed, y_train_adult)
-#     # adult_preds = adult_model.predict(X_test_adult_preprocessed)
-#     # adult_preds = (adult_preds > 0.5).astype(int)  # Convert probabilities to binary output
-#     # print("Adult Prediction Accuracy:", accuracy_score(y_test_adult, adult_preds))
-#
-#     # model_path = 'adult_xgb_model.json'
-#     # preprocessor_path = 'adult_preprocessor.pkl'
-#     #
-#     # adult_model.save(model_path, preprocessor_path)
-#     #
-#     # loaded_model = AdultModel()
-#     # loaded_model.load(model_path, preprocessor_path)
-#     #
-#     # adult_preds = loaded_model.predict(X_test_adult_preprocessed)
-#     # adult_preds = (adult_preds > 0.5).astype(int)  # Convert probabilities to binary output
-#     # print("Adult Prediction Accuracy:", accuracy_score(y_test_adult, adult_preds))
-#
-#
-# # # Set a seed value
-# # seed_value = 42
-# #
-# # # Set `torch` random seed for all devices (CPU and CUDA)
-# # torch.manual_seed(seed_value)
-# # if torch.cuda.is_available():
-# #     torch.cuda.manual_seed_all(seed_value)  # For CUDA devices
-# #
-# # # Set `numpy` random seed
-# # np.random.seed(seed_value)
-# #
-# # # Set `random` seed for Python standard library functions
-# # random.seed(seed_value)
-# if __name__ == "__main__":
-#     main()
-# #     model_path = 'adult_xgb_model.json'
-# #     preprocessor_path = 'adult_preprocessor.pkl'
-# #
-# #     loaded_model = AdultModel()
-# #     loaded_model.load(model_path, preprocessor_path)
-# #
-# #     X_train_adult, X_test_adult, y_train_adult, y_test_adult = create_train_test_sets()
-# #     print(f"Training set size: {X_train_adult.shape[0]} samples")
-# #     print(f"Test set size: {X_test_adult.shape[0]} samples")
-# #
-# #     loaded_model.preprocessor.fit(X_train_adult)
-# #     X_train_adult_preprocessed = loaded_model.preprocess(X_train_adult)
-# #     X_test_adult_preprocessed = loaded_model.preprocess(X_test_adult)
-# #
-# #     adult_preds = loaded_model.predict(X_test_adult_preprocessed)
-# #     adult_preds = (adult_preds > 0.5).astype(int)  # Convert probabilities to binary output
-# #     print("Adult Prediction Accuracy:", accuracy_score(y_test_adult, adult_preds))

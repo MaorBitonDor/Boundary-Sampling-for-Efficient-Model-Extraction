@@ -1,98 +1,67 @@
 import time
 
-import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
-import torch.nn as nn
-import torch.nn.parallel
+from matplotlib import pyplot as plt
+from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import transforms
+from torchvision.datasets import FashionMNIST
 
-from MNISTClassifier import one_hot_encode
-from Utility import prepare_for_training
+from BAM_Code.Utility import prepare_for_training
 
 
-class AlexnetSurrogate(nn.Module):
-    def __init__(self, num_classes=10):
-        super(AlexnetSurrogate, self).__init__()
+class MNISTClassifier(nn.Module):
 
-        self.conv1 = nn.Conv2d(3, 48, kernel_size=5, stride=1, padding=2)
-        self.conv1.bias.data.normal_(0, 0.01)
-        self.conv1.bias.data.fill_(0)
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)  # BatchNorm layer after the first convolution
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)  # BatchNorm layer after the second convolution
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)  # BatchNorm layer after the third convolution
+        self.fc1 = nn.Linear(128 * 28 * 28, 256)
+        self.bn4 = nn.BatchNorm1d(
+            256
+        )  # BatchNorm layer after the first fully connected layer
+        self.fc2 = nn.Linear(256, 128)
+        self.bn5 = nn.BatchNorm1d(
+            128
+        )  # BatchNorm layer after the second fully connected layer
+        self.fc3 = nn.Linear(128, 10)
         self.relu = nn.ReLU()
-        self.lrn = nn.LocalResponseNorm(2)
-        self.pad = nn.MaxPool2d(3, stride=2)
-        self.batch_norm1 = nn.BatchNorm2d(48, eps=0.001)
-
-        self.layer1 = self.make_residue_block(48, 128, stride=1)
-        self.layer2 = self.make_residue_block(128, 192, stride=2)
-        self.layer3 = self.make_residue_block(192, 192, stride=1)
-        self.layer4 = self.make_residue_block(192, 128, stride=2)
-
-        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(128, 512)
-        self.fc1.bias.data.normal_(0, 0.01)
-        self.fc1.bias.data.fill_(0)
-        self.drop = nn.Dropout(p=0.5)
-        self.batch_norm2 = nn.BatchNorm1d(512, eps=0.001)
-
-        self.fc2 = nn.Linear(512, 256)
-        self.fc2.bias.data.normal_(0, 0.01)
-        self.fc2.bias.data.fill_(0)
-        self.batch_norm3 = nn.BatchNorm1d(256, eps=0.001)
-
-        self.fc3 = nn.Linear(256, num_classes)
-        self.fc3.bias.data.normal_(0, 0.01)
-        self.fc3.bias.data.fill_(0)
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.test_accuracy_list = []
-
+        self.softmax = nn.Softmax(dim=1)
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
         )
-        testset = datasets.CIFAR10(
-            root="./data", train=False, download=True, transform=transform
+        test_dataset = FashionMNIST(
+            root="./data", train=False, transform=transform, download=True
         )
-        self.testloader = DataLoader(testset, batch_size=64, shuffle=False)
-
-    def make_residue_block(self, in_channels, out_channels, stride):
-        return nn.Sequential(
-            nn.Conv2d(
-                in_channels, out_channels, kernel_size=3, stride=stride, padding=1
-            ),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
+        self.testloader = DataLoader(test_dataset, batch_size=512, shuffle=False)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.test_accuracy_list = []
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.lrn(x)
-        x = self.pad(x)
-        x = self.batch_norm1(x)
-
-        # Residue blocks
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avg_pool(x)
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.relu(self.bn3(self.conv3(x)))
         x = x.view(x.size(0), -1)
-
-        x = self.fc1(x)
-        x = self.drop(x)
-        x = self.batch_norm2(x)
-
-        x = self.fc2(x)
-        x = self.batch_norm3(x)
-
+        x = self.relu(self.bn4(self.fc1(x)))
+        x = self.relu(self.bn5(self.fc2(x)))
         x = self.fc3(x)
+        x = self.softmax(x)
+        return x
 
+    def real_forward(self, x):
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.relu(self.bn3(self.conv3(x)))
+        x = x.view(x.size(0), -1)
+        x = self.relu(self.bn4(self.fc1(x)))
+        x = self.relu(self.bn5(self.fc2(x)))
+        x = self.fc3(x)
+        x = self.softmax(x)
         return x
 
     def train_model(
@@ -102,7 +71,7 @@ class AlexnetSurrogate(nn.Module):
         optimizer,
         n_epochs=10,
         print_every=500,
-        model_name="Alexnet_surrogate_model",
+        model_name="mnist_model",
     ):
         model, best_val_accuracy, best_model_state_dict, start_epoch = (
             prepare_for_training(self, model_name, optimizer)
@@ -114,8 +83,10 @@ class AlexnetSurrogate(nn.Module):
             start_time = time.time()
             start_time_epoch = time.time()
             for i, (inputs, labels) in enumerate(train_loader, 0):
-                inputs = inputs.view(inputs.shape[0], 3, 32, 32).detach().clone()
+                inputs = inputs.view(inputs.shape[0], 1, 28, 28).detach().clone()
+                # inputs = inputs.view(inputs.shape[0], -1).detach().clone()
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
+                optimizer.zero_grad()
                 if torch.cuda.is_available():
                     outputs = model(inputs)
                 else:
@@ -143,14 +114,8 @@ class AlexnetSurrogate(nn.Module):
                         .requires_grad_(True)
                     )
 
-                # # Get the maximum values along the third dimension (dimension with size 10)
-                # fitnesses, _ = torch.max(labels_copy, dim=2)
-                # # Sum all the elements in the tensor to get a scalar
-                # sum_fitnesses = torch.sum(torch.max(-torch.log(fitnesses), torch.tensor(100))).requires_grad_()
                 outputs, labels = outputs.to(self.device), labels.to(self.device)
                 loss = criterion(outputs, labels)  # + sum_fitnesses
-
-                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
@@ -207,11 +172,9 @@ class AlexnetSurrogate(nn.Module):
             print("Saved model checkpoint!")
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-
         print(
             f"The maximal accuracy during training was: {max(self.test_accuracy_list)} on epoch: {self.test_accuracy_list.index(max(self.test_accuracy_list))}"
         )
-        # self.plot_accuracy_graph()
 
     def plot_accuracy_graph(self):
         accuracy_list = self.test_accuracy_list
@@ -219,17 +182,10 @@ class AlexnetSurrogate(nn.Module):
         sns.set(style="darkgrid")
         sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker="X")
 
-        # # Add accuracy values as annotations
-        # for i, accuracy in enumerate(accuracy_list):
-        #     plt.annotate(f"{accuracy:.2f}", (i, accuracy), textcoords="offset points", xytext=(0, 10), ha='center')
-
         # Set labels and title
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy")
         plt.title("Accuracy Over Epochs")
-
-        # Set x-axis ticks as integers
-        # plt.xticks(range(len(accuracy_list)))
 
         # Display the plot
         plt.show()
@@ -246,7 +202,8 @@ class AlexnetSurrogate(nn.Module):
         # Don't need to keep track of gradients
         with torch.no_grad():
             for images, labels in self.testloader:
-                images = images.view(images.shape[0], 3, 32, 32).detach().clone()
+                images = images.view(images.shape[0], 1, 28, 28).detach().clone()
+                # images = images.view(images.shape[0], -1).detach().clone()
                 if torch.cuda.is_available():
                     outputs = model(images)
                 else:
@@ -267,33 +224,33 @@ class AlexnetSurrogate(nn.Module):
 
     def test_model(self):
         # Test the model
-        # self.eval()
         correct = 0
         total = 0
-        model = None
-        if torch.cuda.is_available():
-            num_of_gpus = torch.cuda.device_count()
-            gpu_list = list(range(num_of_gpus))
-            model = nn.DataParallel(self, device_ids=gpu_list).to(self.device)
-        # Don't need to keep track of gradients
+        # Define a transform to normalize the data
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+        )
+        self.eval()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         with torch.no_grad():
             for images, labels in self.testloader:
-                images = images.view(images.shape[0], 3, 32, 32).detach().clone()
-                if torch.cuda.is_available():
-                    outputs = model(images)
-                else:
-                    outputs = self(images)
-                images, labels, outputs = (
-                    images.to(self.device),
-                    labels.to(self.device),
-                    outputs.to(self.device),
-                )
+                images, labels = images.to(device), labels.to(device)
+                outputs = self(images)
                 _, predicted = torch.max(outputs, dim=1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-
-        print(f"Accuracy on test set is: {100 * correct / total}")
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        # self.train()
+        print(f"Accuracy: {100 * correct / total}")
+        self.train(True)
         return correct / total
+
+    @staticmethod
+    def generate_random_data(num, tile_size=5, num_tiles=50):
+        image_size = (1, 1, 28, 28)
+        data = [torch.rand(image_size) for _ in range(num)]
+        return data
+
+
+def one_hot_encode(x, num_classes):
+    vec = [0.0] * num_classes
+    vec[x] = 1.0
+    return vec

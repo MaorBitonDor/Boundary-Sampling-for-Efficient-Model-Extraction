@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import warnings
-from typing import Optional, List, Tuple, Callable, Any, Dict
+from typing import List, Tuple, Callable, Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -11,11 +11,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, RobustScaler
 from ucimlrepo import fetch_ucirepo
 
-from BAM_Algorithm import BasicModelGeneticAlgorithm
-from BAM_Algorithm_Tabular import BasicModelGeneticAlgorithmTabular
-from Config import Config
-from DatasetLoader import DatasetLoader
-from SmallDatasetsDatasetLoader import SmallDatasetDatasetLoader
+from BAM_Code.BAM_Algorithm import BasicModelGeneticAlgorithm
+from BAM_Code.BAM_Algorithm_Tabular import BasicModelGeneticAlgorithmTabular
+from BAM_Code.Config import Config
+from BAM_Code.DatasetLoader import DatasetLoader
+from BAM_Code.SmallDatasetsDatasetLoader import SmallDatasetDatasetLoader
 
 warnings.filterwarnings("ignore")
 pd.options.display.float_format = "{:,.2f}".format
@@ -769,8 +769,8 @@ def preprocess_nsl_kdd(dataframe):
     dataframe.drop(labels=num_cols, axis="columns", inplace=True)
     dataframe[num_cols] = scaled_df[num_cols]
 
-    dataframe.loc[dataframe['outcome'] == "normal", "outcome"] = 0
-    dataframe.loc[dataframe['outcome'] != 0, "outcome"] = 1
+    dataframe.loc[dataframe["outcome"] == "normal", "outcome"] = 0
+    dataframe.loc[dataframe["outcome"] != 0, "outcome"] = 1
 
     dataframe = pd.get_dummies(dataframe, columns=["protocol_type", "service", "flag"])
     return dataframe

@@ -1,10 +1,10 @@
 import torch
 from torch import nn
 
-from Alexnet import Alexnet
-from AlexnetSurrogate import AlexnetSurrogate
-from Config import Config
-from Utility import (
+from Assets.Alexnet import Alexnet
+from Assets.AlexnetSurrogate import AlexnetSurrogate
+from BAM_Code.Config import Config
+from BAM_Code.Utility import (
     prepare_config_and_log,
     generate_random_data_cifar_old,
     BAM_main_algorithm,
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_of_classes = config["num_of_classes"]
     name = "teacher_alexnet_for_cifar10"
-    ckpt_path = "teacher_alexnet_for_cifar10_state_dict"
+    ckpt_path = "../Assets/teacher_alexnet_for_cifar10_state_dict"
     alex = Alexnet(name, num_of_classes)
     alex.load_state_dict(torch.load(ckpt_path, map_location=device))
     alex.to(device)

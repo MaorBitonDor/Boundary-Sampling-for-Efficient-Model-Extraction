@@ -5,13 +5,12 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import models, transforms, datasets
 
-from Config import Config
-from MNISTClassifier import one_hot_encode
-from Utility import prepare_for_training, prepare_config_and_log
+from BAM_Code.Config import Config
+from Assets.MNISTClassifier import one_hot_encode
+from BAM_Code.Utility import prepare_for_training, prepare_config_and_log
 
 
 # Define the CNN model
@@ -58,8 +57,8 @@ class ImagenetteClassifier(nn.Module):
         # Load the training dataset
         prepare_config_and_log()
         batch_size = Config.instance["batch_size"]
-        train_dir = "data/Imagnette/train"
-        valid_dir = "data/Imagnette/val"
+        train_dir = "../data/Imagnette/train"
+        valid_dir = "../data/Imagnette/val"
         train_dataset = datasets.ImageFolder(root=train_dir, transform=train_transform)
         self.train_loader = DataLoader(
             dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=16
@@ -104,19 +103,12 @@ class ImagenetteClassifier(nn.Module):
         model, best_val_accuracy, best_model_state_dict, start_epoch = (
             prepare_for_training(self, model_name, optimizer)
         )
-        # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i for i in range(100, 300, 50)],
-        #                                                     last_epoch=-1)
-        # lr_scheduler = self.lr_scheduler(n_epochs, 1, 0., 0.1)
         for epoch in range(start_epoch, n_epochs):
             running_loss = 0.0
             correct = 0
             total = 0
             start_time = time.time()
             start_time_epoch = time.time()
-            # Manually clip the learning rate to a lower limit
-            # lower_limit = 1e-5
-            # for param_group in optimizer.param_groups:
-            #     param_group['lr'] = max(param_group['lr'], lower_limit)
             if epoch == 5:
                 batch_size = 512
                 train_loader = DataLoader(
@@ -157,10 +149,7 @@ class ImagenetteClassifier(nn.Module):
                     )
 
                 outputs, labels = outputs.to(self.device), labels.to(self.device)
-                # outputs *= 1e2
-                loss = criterion(outputs, labels)  # + sum_fitnesses
-                # lr = lr_scheduler(epoch + (i + 1) / len(train_loader))
-                # optimizer.param_groups[0].update(lr=lr)
+                loss = criterion(outputs, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -233,24 +222,15 @@ class ImagenetteClassifier(nn.Module):
         sns.set(style="darkgrid")
         sns.lineplot(x=range(len(accuracy_list)), y=accuracy_list, marker="X")
 
-        # # Add accuracy values as annotations
-        # for i, accuracy in enumerate(accuracy_list):
-        #     plt.annotate(f"{accuracy:.2f}", (i, accuracy), textcoords="offset points", xytext=(0, 10), ha='center')
-
         # Set labels and title
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy")
         plt.title("Accuracy Over Epochs")
 
-        # Set x-axis ticks as integers
-        # plt.xticks(range(len(accuracy_list)))
-
         # Display the plot
         plt.show()
 
     def validate_model(self):
-        # Test the model
-        # self.eval()
         correct = 0
         total = 0
         model = None
@@ -285,7 +265,6 @@ class ImagenetteClassifier(nn.Module):
         print(f"Accuracy on test set is: {100 * correct / total:.3f}%")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        # self.train(True)
         return correct / total
 
     def test_model(self):
@@ -298,8 +277,6 @@ class ImagenetteClassifier(nn.Module):
             num_of_gpus = torch.cuda.device_count()
             gpu_list = list(range(num_of_gpus))
             model = nn.DataParallel(self, device_ids=gpu_list).to(self.device)
-        # Don't need to keep track of gradients
-        # batch_size = 64
         prepare_config_and_log()
         batch_size = Config.instance["batch_size"]
         testloader = DataLoader(
@@ -353,59 +330,3 @@ class ImagenetteClassifier(nn.Module):
         elif lr_mode == 0:
             lr_schedule = lambda t: self.step_lr(lr_max, t, epochs)
         return lr_schedule
-
-
-# # Define data transformations
-# image_size = 224
-# image_crop = 224
-# train_transform = transforms.Compose([
-#     transforms.Resize(image_size),
-#     transforms.CenterCrop(image_crop),
-#     # transforms.RandomHorizontalFlip(),
-#     # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-#     # transforms.RandomRotation(degrees=60),
-#     transforms.ToTensor(),
-#     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-# ])
-#
-# val_transform = transforms.Compose([
-#     transforms.Resize(image_size),
-#     transforms.CenterCrop(image_crop),
-#     transforms.ToTensor(),
-#     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-# ])
-#
-# # Load the dataset
-# train_dir = 'data/Imagnette/train'
-# valid_dir = 'data/Imagnette/val'
-# train_dataset = datasets.ImageFolder(root=train_dir, transform=train_transform)
-# test_dataset = datasets.ImageFolder(root=valid_dir, transform=val_transform)
-#
-# # Create data loaders
-# prepare_config_and_log()
-# # batch_size = Config.instance["batch_size"]
-# batch_size = 64
-# train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=16)
-# test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=16)
-#
-# # Initialize the model, loss function, and optimizer
-# model = ImagenetteClassifier(num_classes=10, model_type="resnet18")
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# model.to(device)
-# criterion = nn.MSELoss()
-# optimizer = optim.AdamW(model.parameters(), lr=0.05)
-# model.train_model(train_loader, criterion, optimizer, 1000)
-# model.test_model()
-# directory = f"checkpoints/TargetModels"
-# if model.__class__.__name__ == 'DataParallel':
-#     checkpoint = {
-#         'model_state_dict': model.module.state_dict(),
-#         'optimizer_state_dict': optimizer.state_dict()
-#     }
-# else:
-#     checkpoint = {
-#         'model_state_dict': model.state_dict(),
-#         'optimizer_state_dict': optimizer.state_dict()
-#     }
-# model_name = "ImagenetteClassifier_target224"
-# torch.save(checkpoint, f'./{directory}/{model_name}.pth')
